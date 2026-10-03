@@ -1,0 +1,6 @@
+writer-local
+============
+
+Original work (MIT). The "pattern = one Markdown file with a system prompt" idea follows
+danielmiessler/Fabric (https://github.com/danielmiessler/Fabric, MIT); no Fabric code or
+pattern text is included — all patterns here are written in Korean for public-institution use.

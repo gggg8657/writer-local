@@ -1,0 +1,128 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>writer local</title>
+<style>
+  :root{--bg:#fafaf8;--fg:#1f1f1f;--muted:#777;--line:#ddd;--acc:#2f6fed}
+  body{font:15px/1.65 -apple-system,"Pretendard","Apple SD Gothic Neo",system-ui,sans-serif;background:var(--bg);color:var(--fg);max-width:1100px;margin:0 auto;padding:20px 16px}
+  h1{font-size:20px;margin:0 0 4px}h1 small{font-weight:400;color:var(--muted);font-size:13px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:10px 0}
+  .tabs button{border:none;border-bottom:2px solid transparent;border-radius:0;background:none;padding:6px 12px;cursor:pointer;color:var(--muted);font:inherit}
+  .tabs button.on{color:var(--fg);border-bottom-color:var(--acc)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:14px}
+  .card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#fff;cursor:pointer}.card:hover,.card.on{border-color:var(--acc)}
+  .card b{display:block}.card span{font-size:12px;color:var(--muted)}
+  form{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px}
+  form label{display:flex;flex-direction:column;font-size:13px;color:var(--muted)}form label.wide{grid-column:1/-1}
+  input,select,textarea,button{font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff}textarea{min-height:70px;resize:vertical}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0}
+  button.primary{background:var(--acc);color:#fff;border-color:var(--acc);padding:6px 22px;cursor:pointer}button:disabled{opacity:.5}
+  #status{color:var(--muted);font-size:13px}
+  #out{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;min-height:120px;line-height:1.9}
+  .vt{display:flex;gap:4px;margin-top:12px}.vt button{cursor:pointer}.vt button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  #runs{font-size:13px}#runs li{cursor:pointer;padding:3px 0;list-style:none}#runs li:hover{color:var(--acc)}
+  details{margin-top:14px}summary{cursor:pointer;color:var(--muted);font-size:13px}
+</style>
+
+<h1>writer local <small>— 건배사·경조사·축사·공지 … 패턴으로 쓰는 로컬 LLM 글쓰기</small></h1>
+<div class="tabs" id="cats"></div>
+<div class="grid" id="grid"></div>
+
+<div id="editor" hidden>
+  <form id="form" onsubmit="return false"></form>
+  <div class="bar">
+    <label>모델 <select id="model"></select></label>
+    <button id="go" class="primary">생성</button>
+    <button data-tweak="shorter">더 짧게</button><button data-tweak="formal">더 격식</button><button data-tweak="casual">더 캐주얼</button>
+    <button id="copy">복사</button><button id="hum" hidden>AI 티 제거</button>
+    <span id="status"></span>
+  </div>
+  <div class="vt" id="vt"></div>
+  <div id="out"></div>
+</div>
+
+<details><summary>이전 실행 기록</summary><ul id="runs"></ul></details>
+
+<script>
+const $ = id => document.getElementById(id);
+const MODEL_DEFAULT = %MODEL%;
+let PATS = [], cur = null, res = null, vi = 0;
+fetch('/api/models').then(r => r.json()).then(ms => $('model').innerHTML = ms.map(m => `<option ${m === MODEL_DEFAULT ? 'selected' : ''}>${m}</option>`).join(''))
+  .catch(() => $('status').textContent = 'LLM 서버에 연결할 수 없습니다');
+fetch('/api/humanize_ok').then(r => r.json()).then(j => $('hum').hidden = !j.ok);
+
+fetch('/api/patterns').then(r => r.json()).then(ps => {
+  PATS = ps; const cats = [...new Set(ps.map(p => p.category))];
+  $('cats').innerHTML = cats.map((c, i) => `<button class="${i ? '' : 'on'}" data-c="${c}">${c}</button>`).join('');
+  $('cats').querySelectorAll('button').forEach(b => b.onclick = () => { $('cats').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); grid(b.dataset.c); });
+  grid(cats[0]);
+});
+function grid(c) {
+  $('grid').innerHTML = PATS.filter(p => p.category === c).map(p => `<div class="card ${cur && cur.name === p.name ? 'on' : ''}" data-n="${p.name}"><b>${p.title}</b><span>${p.description}</span></div>`).join('');
+  $('grid').querySelectorAll('.card').forEach(d => d.onclick = () => pick(d.dataset.n));
+}
+function pick(n) {
+  cur = PATS.find(p => p.name === n); res = null; $('out').textContent = ''; $('vt').innerHTML = '';
+  $('grid').querySelectorAll('.card').forEach(d => d.classList.toggle('on', d.dataset.n === n));
+  $('form').innerHTML = cur.inputs.map(i => {
+    const req = i.required ? ' required' : '', ph = i.placeholder ? ` placeholder="${i.placeholder}"` : '';
+    const el = i.type === 'select' ? `<select name="${i.key}">${i.options.map(o => `<option>${o}</option>`).join('')}</select>`
+      : i.type === 'textarea' ? `<textarea name="${i.key}"${ph}${req}></textarea>`
+      : `<input name="${i.key}" type="${i.type === 'number' ? 'number' : 'text'}"${ph}${req}>`;
+    return `<label class="${i.type === 'textarea' ? 'wide' : ''}">${i.label}${i.required ? ' *' : ''}${el}</label>`;
+  }).join('');
+  $('editor').hidden = false;
+}
+function show(j) {
+  res = j; vi = 0;
+  $('vt').innerHTML = j.variants.length > 1 ? j.variants.map((_, i) => `<button class="${i ? '' : 'on'}" data-i="${i}">${i + 1}안</button>`).join('') : '';
+  $('vt').querySelectorAll('button').forEach(b => b.onclick = () => { vi = +b.dataset.i; $('vt').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); $('out').textContent = res.variants[vi]; });
+  $('out').textContent = j.variants[0];
+}
+async function run(tweak) {
+  if (!cur) return;
+  const values = Object.fromEntries(new FormData($('form')).entries());
+  for (const i of cur.inputs) if (i.required && !(values[i.key] || '').trim()) { $('status').textContent = i.label + ' 입력 필요'; return; }
+  $('go').disabled = true; $('status').textContent = '생성 중'; $('out').textContent = ''; $('vt').innerHTML = '';
+  const t0 = Date.now();
+  try {
+    const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pattern: cur.name, values, model: $('model').value, tweak, prev: tweak && res ? res.variants[vi] : null }) });
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i; while ((i = buf.indexOf('\n\n')) >= 0) {
+        const line = buf.slice(0, i); buf = buf.slice(i + 2);
+        if (!line.startsWith('data: ')) continue;
+        const ev = JSON.parse(line.slice(6));
+        if (ev.reset) $('out').textContent = '';
+        if (ev.token) $('out').textContent += ev.token;
+        if (ev.error) throw new Error(ev.error);
+        if (ev.done) { show(ev.done); loadRuns(); }
+      }
+    }
+    $('status').textContent = `완료 ${((Date.now() - t0) / 1000).toFixed(0)}초`;
+  } catch (e) { $('status').textContent = '오류: ' + e.message; }
+  $('go').disabled = false;
+}
+$('go').onclick = () => run(null);
+document.querySelectorAll('[data-tweak]').forEach(b => b.onclick = () => run(b.dataset.tweak));
+$('copy').onclick = () => navigator.clipboard.writeText($('out').textContent);
+$('hum').onclick = async () => {
+  if (!res) return; $('status').textContent = 'AI 티 제거 중 (humanize-kr)';
+  const j = await fetch('/api/humanize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: res.variants[vi] }) }).then(r => r.json());
+  if (j.error) { $('status').textContent = '오류: ' + j.error; return; }
+  res.variants[vi] = j.output; $('out').textContent = j.output; $('status').textContent = '윤문 완료';
+};
+async function loadRuns() {
+  const rs = await fetch('/api/runs').then(r => r.json());
+  $('runs').innerHTML = rs.map(r => `<li data-id="${r.run_id}">${r.ts} · ${r.title} · ${r.model} · ${r.head}…</li>`).join('') || '<li>없음</li>';
+  $('runs').querySelectorAll('li[data-id]').forEach(li => li.onclick = async () => {
+    const j = await fetch('/api/runs/' + li.dataset.id).then(r => r.json()); pick(j.pattern);
+    for (const [k, v] of Object.entries(j.values)) { const el = $('form').elements[k]; if (el) el.value = v; }
+    show(j);
+  });
+}
+loadRuns();
+</script>
