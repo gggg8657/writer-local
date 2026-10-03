@@ -201,7 +201,7 @@ def generate(name, values, model=MODEL, tweak=None, prev=None, emit=lambda ev: N
     out = _clean(ollama(system, user, model, on_token=lambda t: emit({"token": t})))
     if not out:  # ponytail: think 블록만 내고 끝나는 모델 대비 1회 재시도
         out = _clean(ollama(system, user, model, on_token=lambda t: emit({"token": t})))
-    run_id = f"{datetime.date.today()}-{secrets.token_hex(2)}"
+    run_id = f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{secrets.token_hex(1)}"  # 시각 포함 → 목록이 시간순
     result = {"run_id": run_id, "pattern": name, "title": p["title"], "model": model, "values": values, "tweak": tweak,
               "variants": split_variants(out, n), "raw": out, "ts": datetime.datetime.now().isoformat(timespec="seconds")}
     os.makedirs(WS, exist_ok=True)
@@ -247,7 +247,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(models())
             if self.path == "/api/runs":
                 return self._send(list_runs())
-            m = re.fullmatch(r"/api/runs/(\d{4}-\d{2}-\d{2}-[0-9a-f]{4})", self.path)
+            m = re.fullmatch(r"/api/runs/(\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f]{2})", self.path)
             if m:
                 return self._send(read(os.path.join(WS, m.group(1) + ".json")).encode())
             if self.path == "/api/humanize_ok":
@@ -263,6 +263,8 @@ class H(BaseHTTPRequestHandler):
             self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
 
     def do_POST(self):
+        if self.path not in ("/api/generate", "/api/humanize"):
+            return self._send({"error": "not found"}, code=404)
         req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         if self.path == "/api/humanize":
             try:
