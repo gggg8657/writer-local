@@ -47,11 +47,11 @@
 const $ = id => document.getElementById(id);
 const MODEL_DEFAULT = %MODEL%;
 let PATS = [], cur = null, res = null, vi = 0;
-fetch('/api/models').then(r => r.json()).then(ms => $('model').innerHTML = ms.map(m => `<option ${m === MODEL_DEFAULT ? 'selected' : ''}>${m}</option>`).join(''))
+fetch('api/models').then(r => r.json()).then(ms => $('model').innerHTML = ms.map(m => `<option ${m === MODEL_DEFAULT ? 'selected' : ''}>${m}</option>`).join(''))
   .catch(() => $('status').textContent = 'LLM 서버에 연결할 수 없습니다');
-fetch('/api/humanize_ok').then(r => r.json()).then(j => $('hum').hidden = !j.ok);
+fetch('api/humanize_ok').then(r => r.json()).then(j => $('hum').hidden = !j.ok);
 
-fetch('/api/patterns').then(r => r.json()).then(ps => {
+fetch('api/patterns').then(r => r.json()).then(ps => {
   PATS = ps; const cats = [...new Set(ps.map(p => p.category))];
   $('cats').innerHTML = cats.map((c, i) => `<button class="${i ? '' : 'on'}" data-c="${c}">${c}</button>`).join('');
   $('cats').querySelectorAll('button').forEach(b => b.onclick = () => { $('cats').querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); grid(b.dataset.c); });
@@ -86,7 +86,7 @@ async function run(tweak) {
   $('go').disabled = true; $('status').textContent = '생성 중'; $('out').textContent = ''; $('vt').innerHTML = '';
   const t0 = Date.now();
   try {
-    const r = await fetch('/api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const r = await fetch('api/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pattern: cur.name, values, model: $('model').value, tweak, prev: tweak && res ? res.variants[vi] : null }) });
     const reader = r.body.getReader(), dec = new TextDecoder(); let buf = '';
     while (true) {
@@ -111,15 +111,15 @@ document.querySelectorAll('[data-tweak]').forEach(b => b.onclick = () => run(b.d
 $('copy').onclick = () => navigator.clipboard.writeText($('out').textContent);
 $('hum').onclick = async () => {
   if (!res) return; $('status').textContent = 'AI 티 제거 중 (humanize-kr)';
-  const j = await fetch('/api/humanize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: res.variants[vi] }) }).then(r => r.json());
+  const j = await fetch('api/humanize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: res.variants[vi] }) }).then(r => r.json());
   if (j.error) { $('status').textContent = '오류: ' + j.error; return; }
   res.variants[vi] = j.output; $('out').textContent = j.output; $('status').textContent = '윤문 완료';
 };
 async function loadRuns() {
-  const rs = await fetch('/api/runs').then(r => r.json());
+  const rs = await fetch('api/runs').then(r => r.json());
   $('runs').innerHTML = rs.map(r => `<li data-id="${r.run_id}">${r.ts} · ${r.title} · ${r.model} · ${r.head}…</li>`).join('') || '<li>없음</li>';
   $('runs').querySelectorAll('li[data-id]').forEach(li => li.onclick = async () => {
-    const j = await fetch('/api/runs/' + li.dataset.id).then(r => r.json()); pick(j.pattern);
+    const j = await fetch('api/runs/' + li.dataset.id).then(r => r.json()); pick(j.pattern);
     for (const [k, v] of Object.entries(j.values)) { const el = $('form').elements[k]; if (el) el.value = v; }
     show(j);
   });
