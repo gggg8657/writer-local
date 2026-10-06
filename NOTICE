@@ -4,3 +4,6 @@ writer-local
 Original work (MIT). The "pattern = one Markdown file with a system prompt" idea follows
 danielmiessler/Fabric (https://github.com/danielmiessler/Fabric, MIT); no Fabric code or
 pattern text is included — all patterns here are written in Korean for public-institution use.
+
+This package: Copyright (c) 2026 김동주 <dongjukim.dev@gmail.com>
+화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.
