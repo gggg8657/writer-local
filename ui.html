@@ -22,6 +22,9 @@
   .vt{display:flex;gap:4px;margin-top:12px}.vt button{cursor:pointer}.vt button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
   #runs{font-size:13px}#runs li{cursor:pointer;padding:3px 0;list-style:none}#runs li:hover{color:var(--acc)}
   details{margin-top:14px}summary{cursor:pointer;color:var(--muted);font-size:13px}
+  /* 넘침 방지: 긴 단어(URL·파일명)·표 줄바꿈, 탭 줄바꿈 */
+  form{grid-template-columns:repeat(2,minmax(0,1fr))}form label{min-width:0}@media (max-width:600px){form{grid-template-columns:minmax(0,1fr)}}
+  .tabs{flex-wrap:wrap}.card,#out,#status,#runs,form label{overflow-wrap:anywhere}
 </style>
 
 <h1>writer local <small>— 건배사·경조사·축사·공지 … 패턴으로 쓰는 로컬 LLM 글쓰기</small></h1>
@@ -141,7 +144,7 @@ function _pdiff(a, b, side) {  // 어절 단위 LCS — side 0: 원문(지운 �
 }
 function polishBar(mount, o) {  // o.get() → 글, o.set(글), o.run(강도, 글) → 결과(선택: 기본은 api/polish)
   const box = document.createElement('div'); box.hidden = true;
-  box.style.cssText = 'margin:10px 0;padding:8px 10px;border:1px solid #d6e2ff;background:#f1f5ff;border-radius:8px;font-size:14px;color:#1f1f1f';
+  box.style.cssText = 'margin:10px 0;padding:8px 10px;border:1px solid #d6e2ff;background:#f1f5ff;border-radius:8px;font-size:14px;color:#1f1f1f;overflow-wrap:anywhere';
   box.innerHTML = '<b>✍ 윤문하기</b> <select class="pst" style="font:inherit;padding:3px 6px"><option value="light">가볍게 (맞춤법·비문만)</option><option value="standard" selected>보통</option><option value="strong">적극 (간결하게)</option></select> '
     + '<button class="pgo" style="font:inherit;padding:3px 12px">윤문하기</button> <span class="pmsg" style="color:#666;font-size:13px"></span><div class="pchg"></div>';
   mount.after(box);
