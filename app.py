@@ -213,7 +213,7 @@ def list_runs():
     if not os.path.isdir(WS):
         return []
     out = []
-    for fn in sorted(os.listdir(WS), reverse=True)[:50]:
+    for fn in sorted(os.listdir(WS), key=lambda n: os.path.getmtime(os.path.join(WS, n)), reverse=True)[:50]:
         try:
             j = json.load(open(os.path.join(WS, fn), encoding="utf-8"))
             out.append({k: j[k] for k in ("run_id", "title", "model", "ts")} | {"head": j["variants"][0][:40]})
