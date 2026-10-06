@@ -147,7 +147,7 @@ ok "$MODEL"
 
 # ── 6. 자가검증 ──────────────────────────────────────────────────────────
 step "자가검증"
-spin "패턴 로더·안 분리·CLI" "$PY" selftest.py || die "selftest 실패 — patterns/ 가 빠졌는지 확인"
+spin "패턴 로더·안 분리·CLI" env -u WORKSPACE "$PY" selftest.py || die "selftest 실패 — patterns/ 가 빠졌는지 확인"
 ok "17 패턴 로드·분리·CLI 통과"
 
 # ── 7. 웹 서버 ───────────────────────────────────────────────────────────
