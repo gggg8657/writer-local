@@ -2,6 +2,8 @@
 
 건배사·경조사 문구·축사·공지문·감사 편지처럼 형식이 정해진 글을 17개 패턴에서 골라, 입력 몇 칸만 채우면 로컬 LLM이 여러 안으로 써 주는 웹 UI / CLI입니다.
 
+> ⚠️ 연구·내부 시험용 프로토타입입니다(배포·상업 서비스용 아님). 제3자 구성요소의 라이선스는 THIRD_PARTY_NOTICES.md 를 확인하세요.
+
 ![Writer 실행 화면 — ① 생성된 문안 ② 안 전환 ③ 후속 수정](docs/img/writer-usage.png)
 
 ## 무엇을 하나
@@ -111,11 +113,15 @@ inputs:
 ## 출처·감사 (Credits)
 
 - 패턴 = 시스템 프롬프트 Markdown 한 파일 아이디어: [danielmiessler/Fabric](https://github.com/danielmiessler/Fabric) (MIT) — Fabric 의 코드·패턴 문구는 포함하지 않음
-- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma 4](https://huggingface.co/google/gemma-4-31B-it) `gemma4:31b` (모델 카드 기준 Apache-2.0). `LLM_MODEL` 을 주지 않으면 코드 기본값은 `qwen3:8b` ([Qwen3](https://huggingface.co/Qwen/Qwen3-8B), Apache-2.0). 다른 모델을 쓰면 그 모델의 라이선스를 확인하세요.
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
 
-저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+저작권 표기는 `NOTICE`, 제3자 구성요소 전체 목록·라이선스·상업 이용 확인 사항은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 를 보세요.
 
 ## 라이선스
 
 [MIT License](LICENSE) © 2026 gggg8657.
+
+## 만든 사람
+
+DongJu Kim (gggg8657) — 설계·구현
