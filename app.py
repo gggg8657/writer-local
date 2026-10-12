@@ -163,10 +163,10 @@ def models():
         return [m["name"] for m in json.load(r)["models"]]
 
 
-def humanize(text, genre="essay"):
-    """humanize-kr-local 서버에 윤문 요청 (SSE → 마지막 done.output)."""
+def humanize(text, genre="essay", user="owner"):
+    """humanize-kr-local 서버에 윤문 요청 (SSE → 마지막 done.output). 사용자 헤더를 넘겨 그쪽 기록도 그 사용자 폴더에."""
     req = urllib.request.Request(HUMANIZE + "/api/humanize", json.dumps({"text": text, "genre": genre}).encode(),
-                                 {"Content-Type": "application/json"})
+                                 {"Content-Type": "application/json", "X-Agent-User": user})
     with urllib.request.urlopen(req, timeout=3600) as r:
         for line in r:
             if line.startswith(b"data: "):
@@ -184,7 +184,8 @@ def split_variants(text, n):
     return parts[:n] if n > 1 else [text.strip()]
 
 
-def generate(name, values, model=MODEL, tweak=None, prev=None, emit=lambda ev: None):
+def generate(name, values, model=MODEL, tweak=None, prev=None, emit=lambda ev: None, ws=None):
+    ws = ws or WS  # 사용자 폴더 (없으면 예전 WORKSPACE)
     p = PATTERNS.get(name)
     if not p:
         raise ValueError(f"패턴 없음: {name} (있는 것: {', '.join(PATTERNS)})")
@@ -204,18 +205,20 @@ def generate(name, values, model=MODEL, tweak=None, prev=None, emit=lambda ev: N
     run_id = f"{datetime.datetime.now():%Y-%m-%d-%H%M%S}-{secrets.token_hex(1)}"  # 시각 포함 → 목록이 시간순
     result = {"run_id": run_id, "pattern": name, "title": p["title"], "model": model, "values": values, "tweak": tweak,
               "variants": split_variants(out, n), "raw": out, "ts": datetime.datetime.now().isoformat(timespec="seconds")}
-    os.makedirs(WS, exist_ok=True)
-    write(os.path.join(WS, run_id + ".json"), json.dumps(result, ensure_ascii=False, indent=1))
+    os.makedirs(ws, exist_ok=True)
+    write(os.path.join(ws, run_id + ".json"), json.dumps(result, ensure_ascii=False, indent=1))
     return result
 
 
-def list_runs():
-    if not os.path.isdir(WS):
+def list_runs(ws=None):
+    ws = ws or WS  # 사용자 폴더 (없으면 예전 WORKSPACE)
+    if not os.path.isdir(ws):
         return []
     out = []
-    for fn in sorted(os.listdir(WS), key=lambda n: os.path.getmtime(os.path.join(WS, n)), reverse=True)[:50]:
+    names = [n for n in os.listdir(ws) if n.endswith(".json")]  # u/ = 다른 사용자 폴더
+    for fn in sorted(names, key=lambda n: os.path.getmtime(os.path.join(ws, n)), reverse=True)[:50]:
         try:
-            j = json.load(open(os.path.join(WS, fn), encoding="utf-8"))
+            j = json.load(open(os.path.join(ws, fn), encoding="utf-8"))
             out.append({k: j[k] for k in ("run_id", "title", "model", "ts")} | {"head": j["variants"][0][:40]})
         except Exception:
             pass
@@ -223,6 +226,16 @@ def list_runs():
 
 
 # ── HTTP ───────────────────────────────────────────────────────────────
+def user_ws(h):
+    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
+    u = (h.headers.get("X-Agent-User") or "owner").strip()
+    if u == "owner":
+        return WS
+    d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 HTML = read(os.path.join(ROOT, "ui.html")) if os.path.exists(os.path.join(ROOT, "ui.html")) else "ui.html 없음"
 
 
@@ -286,10 +299,10 @@ class H(BaseHTTPRequestHandler):
             if self.path == "/api/models":
                 return self._send(models())
             if self.path == "/api/runs":
-                return self._send(list_runs())
+                return self._send(list_runs(user_ws(self)))
             m = re.fullmatch(r"/api/runs/(\d{4}-\d{2}-\d{2}-\d{6}-[0-9a-f]{2})", self.path)
             if m:
-                return self._send(read(os.path.join(WS, m.group(1) + ".json")).encode())
+                return self._send(read(os.path.join(user_ws(self), m.group(1) + ".json")).encode())
             if self.path == "/api/polish_ok":
                 return self._send({"ok": polish_ok()})
             if self.path == "/api/humanize_ok":
@@ -315,7 +328,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send({"error": f"{type(e).__name__}: {e}"}, code=502)
         if self.path == "/api/humanize":
             try:
-                return self._send({"output": humanize(req.get("text", ""), req.get("genre") or "essay")})
+                return self._send({"output": humanize(req.get("text", ""), req.get("genre") or "essay", self.headers.get("X-Agent-User") or "owner")})
             except Exception as e:
                 return self._send({"error": f"{type(e).__name__}: {e}"}, code=502)
         self.send_response(200)
@@ -329,7 +342,7 @@ class H(BaseHTTPRequestHandler):
 
         try:
             emit({"done": generate(req.get("pattern", ""), req.get("values") or {}, req.get("model") or MODEL,
-                                   req.get("tweak"), req.get("prev"), emit)})
+                                   req.get("tweak"), req.get("prev"), emit, user_ws(self))})
         except Exception as e:
             emit({"error": f"{type(e).__name__}: {e}"})
 
@@ -342,4 +355,4 @@ if __name__ == "__main__":
         print("\n\n=====\n\n".join(r["variants"]))
         sys.exit(0)
     print(f"writer local → http://localhost:{PORT}  (model={MODEL}, llm={LLM_API} {LLM_BASE}, patterns={len(PATTERNS)})  {_SIG}")
-    ThreadingHTTPServer(("", PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
