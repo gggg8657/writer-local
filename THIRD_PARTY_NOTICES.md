@@ -13,7 +13,7 @@
 | Ollama | — | 외부 (LLM 서버가 없으면 setup 이 공식 설치 스크립트로 설치) | MIT | https://github.com/ollama/ollama | 가능 | OpenAI 호환 서버(vLLM 등)로 대체 가능 |
 | Google Gemma 4 (`gemma4:31b`) | — | 가중치 (권장 배포 모델 · 포털 환경 기본값) | Apache-2.0 (모델 카드 `google/gemma-4-31B-it`) | https://huggingface.co/google/gemma-4-31B-it · https://ai.google.dev/gemma/docs/gemma_4_license | 가능 | 저장소에 넣지 않음. 이전 세대 Gemma(1~3)는 별도의 Gemma Terms of Use — 다른 버전을 쓰면 그 조건 확인 |
 | Qwen3 8B (`qwen3:8b`) | — | 가중치 (`LLM_MODEL` 을 안 줄 때 코드·setup 기본값, Ollama 에 모델이 없으면 `ollama pull`) | Apache-2.0 (모델 카드 `Qwen/Qwen3-8B`) | https://huggingface.co/Qwen/Qwen3-8B | 가능 | 저장소에 넣지 않음 |
-| kordoc-local 윤문 API | — | 외부 — ✍ 윤문하기(`KORDOC_URL`) | MIT (같은 저작자) | https://github.com/gggg8657/kordoc-local | 가능 | 선택 기능 |
+| kordoc-local 윤문 API | — | 외부 — ✍ 윤문하기(`KORDOC_URL`) | PolyForm Noncommercial 1.0.0 (같은 저작자; kordoc 자체는 MIT) | https://github.com/gggg8657/kordoc-local | 비상업만 | 선택 기능 |
 
 ## 확인 필요
 
@@ -21,4 +21,4 @@
 
 ## 이 저장소의 원저작물
 
-위 표에 없는 파일(코드·UI·프롬프트·패턴·문서·설정 예시·selftest)은 DongJu Kim(gggg8657)이 작성했고 이 저장소의 `LICENSE`(MIT)를 따릅니다.
+위 표에 없는 파일(코드·UI·프롬프트·패턴·문서·설정 예시·selftest)은 DongJu Kim(gggg8657)이 작성했고 이 저장소의 `LICENSE`(PolyForm Noncommercial 1.0.0)를 따릅니다.
