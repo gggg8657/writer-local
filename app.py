@@ -16,6 +16,7 @@ import sys
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
@@ -166,7 +167,7 @@ def models():
 def humanize(text, genre="essay", user="owner"):
     """humanize-kr-local 서버에 윤문 요청 (SSE → 마지막 done.output). 사용자 헤더를 넘겨 그쪽 기록도 그 사용자 폴더에."""
     req = urllib.request.Request(HUMANIZE + "/api/humanize", json.dumps({"text": text, "genre": genre}).encode(),
-                                 {"Content-Type": "application/json", "X-Agent-User": user})
+                                 {"Content-Type": "application/json", **portal_auth.sign(user)})
     with urllib.request.urlopen(req, timeout=3600) as r:
         for line in r:
             if line.startswith(b"data: "):
@@ -245,7 +246,7 @@ KORDOC_URL = os.environ.get("KORDOC_URL", "http://localhost:8766").rstrip("/")
 
 def polish_remote(text, strength="standard"):
     req = urllib.request.Request(KORDOC_URL + "/api/polish_text", json.dumps({"text": text, "strength": strength}).encode(),
-                                 {"Content-Type": "application/json"})
+                                 {"Content-Type": "application/json", **portal_auth.sign("_service")})   # 도구 간 호출도 포털 서명(portal_auth)
     try:
         with urllib.request.urlopen(req, timeout=1800) as r:
             return json.load(r)
@@ -255,7 +256,7 @@ def polish_remote(text, strength="standard"):
 
 def polish_ok():
     try:
-        urllib.request.urlopen(KORDOC_URL + "/api/models", timeout=2)
+        urllib.request.urlopen(KORDOC_URL + "/healthz", timeout=2)   # 켜짐 확인은 표준 헬스로(LLM 을 부르지 않음, 서명 불필요)
         return True
     except Exception:
         return False
@@ -307,15 +308,17 @@ class H(BaseHTTPRequestHandler):
                 return self._send({"ok": polish_ok()})
             if self.path == "/api/humanize_ok":
                 try:
-                    urllib.request.urlopen(HUMANIZE + "/api/models", timeout=2)
+                    urllib.request.urlopen(HUMANIZE + "/healthz", timeout=2)
                     return self._send({"ok": True})
                 except Exception:
                     return self._send({"ok": False})
+            if self.path.split("?")[0].startswith("/api/"):   # 없는 API 경로는 화면 대신 JSON 404
+                return self._send({"error": "not found"}, code=404)
             self._send(signed(HTML.replace("%MODEL%", json.dumps(MODEL))).encode(), "text/html; charset=utf-8")
         except FileNotFoundError:
             self._send({"error": "없음"}, code=404)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=500)
 
     def do_POST(self):
         if self.path not in ("/api/generate", "/api/humanize", "/api/polish"):
@@ -325,12 +328,12 @@ class H(BaseHTTPRequestHandler):
             try:
                 return self._send(polish_remote(req.get("text", ""), req.get("strength") or "standard"))
             except Exception as e:
-                return self._send({"error": f"{type(e).__name__}: {e}"}, code=502)
+                return self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=502)
         if self.path == "/api/humanize":
             try:
                 return self._send({"output": humanize(req.get("text", ""), req.get("genre") or "essay", self.headers.get("X-Agent-User") or "owner")})
             except Exception as e:
-                return self._send({"error": f"{type(e).__name__}: {e}"}, code=502)
+                return self._send({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")}, code=502)
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-cache")
@@ -344,7 +347,7 @@ class H(BaseHTTPRequestHandler):
             emit({"done": generate(req.get("pattern", ""), req.get("values") or {}, req.get("model") or MODEL,
                                    req.get("tweak"), req.get("prev"), emit, user_ws(self))})
         except Exception as e:
-            emit({"error": f"{type(e).__name__}: {e}"})
+            emit({"error": portal_auth.scrub(f"{type(e).__name__}: {e}")})
 
 
 if __name__ == "__main__":
@@ -355,4 +358,4 @@ if __name__ == "__main__":
         print("\n\n=====\n\n".join(r["variants"]))
         sys.exit(0)
     print(f"writer local → http://localhost:{PORT}  (model={MODEL}, llm={LLM_API} {LLM_BASE}, patterns={len(PATTERNS)})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "writer-local")).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), portal_auth.install(H, "writer-local")).serve_forever()
