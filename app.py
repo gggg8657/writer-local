@@ -355,4 +355,4 @@ if __name__ == "__main__":
         print("\n\n=====\n\n".join(r["variants"]))
         sys.exit(0)
     print(f"writer local → http://localhost:{PORT}  (model={MODEL}, llm={LLM_API} {LLM_BASE}, patterns={len(PATTERNS)})  {_SIG}")
-    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "writer-local")).serve_forever()
